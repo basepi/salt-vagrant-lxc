@@ -2,6 +2,8 @@
 '''
 Cassandra Database Module
 
+.. versionadded:: 2015.2.0
+
 :depends: DataStax Python Driver for Apache Cassandra
           https://github.com/datastax/python-driver
           pip install cassandra-driver
@@ -30,23 +32,32 @@ Cassandra Database Module
           port: 9000
           username: cas_admin
 '''
+
+# Import Python Libs
+from __future__ import absolute_import
 import logging
 import json
-from salt.exceptions import CommandExecutionError
 
-log = logging.getLogger(__name__)
+# Import Salt Libs
+from salt.exceptions import CommandExecutionError
+from salt.ext import six
+
 __virtualname__ = 'cassandra_cql'
 
 HAS_DRIVER = False
 try:
+    # pylint: disable=import-error,no-name-in-module
     from cassandra.cluster import Cluster
     from cassandra.cluster import NoHostAvailable
     from cassandra.connection import ConnectionException, ConnectionShutdown
     from cassandra.auth import PlainTextAuthProvider
     from cassandra.query import dict_factory
+    # pylint: enable=import-error,no-name-in-module
     HAS_DRIVER = True
 except ImportError:
     pass
+
+log = logging.getLogger(__name__)
 
 
 def __virtual__():
@@ -61,7 +72,7 @@ def __virtual__():
     return False
 
 
-def _loadproperties(property_name, config_option, set_default=False, default=None):
+def _load_properties(property_name, config_option, set_default=False, default=None):
     '''
     Load properties for the cassandra module from config or pillar.
 
@@ -80,8 +91,8 @@ def _loadproperties(property_name, config_option, set_default=False, default=Non
         log.debug("No property specified in function, trying to load from salt configuration")
         try:
             options = __salt__['config.option']('cassandra')
-	except BaseException as e:
-	    log.error("Failed to get cassandra config options. Reason: {0}".format(str(e)))
+        except BaseException as e:
+            log.error("Failed to get cassandra config options. Reason: {0}".format(str(e)))
             raise
 
         loaded_property = options.get(config_option)
@@ -111,22 +122,44 @@ def _connect(contact_points=None, port=None, cql_user=None, cql_pass=None):
     :return:               The session and cluster objects.
     :rtype:                cluster object, session object
     '''
-
-    contact_points = _loadproperties(property_name=contact_points, config_option='cluster')
-    contact_points = contact_points if isinstance(contact_points, list) else contact_points.split(',')
-    port = _loadproperties(property_name=port, config_option='port', set_default=True, default=9042)
-    cql_user = _loadproperties(property_name=cql_user, config_option='username', set_default=True, default="cassandra")
-    cql_pass = _loadproperties(property_name=cql_pass, config_option='password', set_default=True, default="cassandra")
-
-    try:
-        auth_provider = PlainTextAuthProvider(username=cql_user, password=cql_pass)
-        cluster = Cluster(contact_points, port=port, auth_provider=auth_provider)
-        session = cluster.connect()
-        log.debug('Successfully connected to Cassandra cluster at {0}'.format(contact_points))
-        return cluster, session
-    except (ConnectionException, ConnectionShutdown, NoHostAvailable):
-        log.error('Could not connect to Cassandra cluster at %s'.format(contact_points))
-        raise CommandExecutionError('ERROR: Could not connect to Cassandra cluster.')
+    # Lazy load the Cassandra cluster and session for this module by creating a
+    # cluster and session when cql_query is called the first time. Get the
+    # Cassandra cluster and session from this module's __context__ after it is
+    # loaded the first time cql_query is called.
+    #
+    # TODO: Call cluster.shutdown() when the module is unloaded on
+    # master/minion shutdown. Currently, Master.shutdown() and Minion.shutdown()
+    # do nothing to allow loaded modules to gracefully handle resources stored
+    # in __context__ (i.e. connection pools). This means that the the connection
+    # pool is orphaned and Salt relies on Cassandra to reclaim connections.
+    # Perhaps if Master/Minion daemons could be enhanced to call an "__unload__"
+    # function, or something similar for each loaded module, connection pools
+    # and the like can be gracefully reclaimed/shutdown.
+    if (__context__
+       and 'cassandra_cql_returner_cluster' in __context__
+       and 'cassandra_cql_returner_session' in __context__):
+       return __context__['cassandra_cql_returner_cluster'], __context__['cassandra_cql_returner_session']
+    else:
+        contact_points = _load_properties(property_name=contact_points, config_option='cluster')
+        contact_points = contact_points if isinstance(contact_points, list) else contact_points.split(',')
+        port = _load_properties(property_name=port, config_option='port', set_default=True, default=9042)
+        cql_user = _load_properties(property_name=cql_user, config_option='username', set_default=True, default="cassandra")
+        cql_pass = _load_properties(property_name=cql_pass, config_option='password', set_default=True, default="cassandra")
+    
+        try:
+            auth_provider = PlainTextAuthProvider(username=cql_user, password=cql_pass)
+            cluster = Cluster(contact_points, port=port, auth_provider=auth_provider)
+            session = cluster.connect()
+            # TODO: Call cluster.shutdown() when the module is unloaded on shutdown.
+            __context__['cassandra_cql_returner_cluster'] = cluster
+            __context__['cassandra_cql_returner_session'] = session
+            log.debug('Successfully connected to Cassandra cluster at {0}'.format(contact_points))
+            return cluster, session
+        except TypeError:
+            pass
+        except (ConnectionException, ConnectionShutdown, NoHostAvailable):
+            log.error('Could not connect to Cassandra cluster at {0}'.format(contact_points))
+            raise CommandExecutionError('ERROR: Could not connect to Cassandra cluster.')
 
 
 def cql_query(query, contact_points=None, port=None, cql_user=None, cql_pass=None):
@@ -168,16 +201,14 @@ def cql_query(query, contact_points=None, port=None, cql_user=None, cql_pass=Non
         raise CommandExecutionError(msg)
 
     if results:
-      for result in results:
-          values = {}
-          for key, value in result.iteritems():
-              # Salt won't return dictionaries with odd types like uuid.UUID
-              if not isinstance(value, unicode):
-                  value = str(value)
-              values[key] = value
-          ret.append(values)
-
-    cluster.shutdown()
+        for result in results:
+            values = {}
+            for key, value in result.iteritems():
+                # Salt won't return dictionaries with odd types like uuid.UUID
+                if not isinstance(value, six.text_type):
+                    value = str(value)
+                values[key] = value
+            ret.append(values)
 
     return ret
 
@@ -205,8 +236,8 @@ def version(contact_points=None, port=None, cql_user=None, cql_pass=None):
 
         salt 'minion1' cassandra.version contact_points=minion1
     '''
-    query = '''select release_version 
-                 from system.local 
+    query = '''select release_version
+                 from system.local
                 limit 1;'''
 
     try:
@@ -294,7 +325,7 @@ def list_keyspaces(contact_points=None, port=None, cql_user=None, cql_pass=None)
 
         salt 'minion1' cassandra.list_keyspaces contact_points=minion1 port=9000
     '''
-    query = '''select keyspace_name 
+    query = '''select keyspace_name
                  from system.schema_keyspaces;'''
 
     ret = {}
@@ -307,7 +338,7 @@ def list_keyspaces(contact_points=None, port=None, cql_user=None, cql_pass=None)
     except BaseException as e:
         log.critical('Unexpected error while listing keyspaces: {0}'.format(str(e)))
         raise
-   
+
     return ret
 
 
@@ -340,8 +371,8 @@ def list_column_families(keyspace=None, contact_points=None, port=None, cql_user
     '''
     where_clause = "where keyspace_name = '{0}'".format(keyspace) if keyspace else ""
 
-    query = '''select columnfamily_name 
-                 from system.schema_columnfamilies 
+    query = '''select columnfamily_name
+                 from system.schema_columnfamilies
                 {0};'''.format(where_clause)
 
     ret = {}
@@ -386,7 +417,7 @@ def keyspace_exists(keyspace, contact_points=None, port=None, cql_user=None, cql
     # Only project the keyspace_name to make the query efficien.
     # Like an echo
     query = '''select keyspace_name
-                 from system.schema_keyspaces 
+                 from system.schema_keyspaces
                 where keyspace_name = '{0}';'''.format(keyspace)
 
     try:
@@ -441,11 +472,11 @@ def create_keyspace(keyspace, replication_strategy='SimpleStrategy', replication
         }
 
         if replication_datacenters:
-            if isinstance(replication_datacenters, basestring):
+            if isinstance(replication_datacenters, six.string_types):
                 try:
                     replication_datacenter_map = json.loads(replication_datacenters)
                     replication_map.update(**replication_datacenter_map)
-                except:
+                except BaseException:  # pylint: disable=W0703
                     log.error("Could not load json replication_datacenters.")
                     return False
             else:
@@ -453,7 +484,7 @@ def create_keyspace(keyspace, replication_strategy='SimpleStrategy', replication
         else:
             replication_map['replication_factor'] = replication_factor
 
-        query = '''create keyspace {0} 
+        query = '''create keyspace {0}
                      with replication = {1} 
                       and durable_writes = true;'''.format(keyspace, replication_map)
 
@@ -644,6 +675,7 @@ def list_permissions(username=None, resource=None, resource_type='keyspace', per
         raise
 
     return ret
+
 
 def grant_permission(username, resource=None, resource_type='keyspace', permission=None, contact_points=None, port=None,
                      cql_user=None, cql_pass=None):

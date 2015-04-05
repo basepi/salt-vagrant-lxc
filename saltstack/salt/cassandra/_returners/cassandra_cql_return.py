@@ -98,6 +98,8 @@ import salt.utils.jid
 import salt.exceptions
 from salt.exceptions import CommandExecutionError
 
+log = logging.getLogger(__name__)
+
 # Import third party libs
 try:
     # The following imports are not directly required by this module. Rather,
@@ -124,7 +126,7 @@ try:
 except ImportError as e:
     HAS_CASSANDRA_DRIVER = False
 
-log = logging.getLogger(__name__)
+#log = logging.getLogger(__name__)
 
 # Define the module's virtual name
 #
@@ -156,10 +158,12 @@ def returner(ret):
                  ret['id'], 
                  ret['fun'], 
                  int(time.time() * 1000),
-                 json.dumps(ret), 
-                 json.dumps(ret['return']), 
+                 json.dumps(ret).replace("'", "''"), 
+                 json.dumps(ret['return']).replace("'", "''"), 
                  ret.get('success', False), 
                )
+
+    log.debug("returner query=>{0}".format(query))
 
     # cassandra_cql.cql_query may raise a CommandExecutionError
     try:
@@ -211,9 +215,11 @@ def event_return(events):
                      {0}, {1}, '{2}', '{3}', '{4}'
                    );'''.format(str(uuid.uuid1()),
                                 int(time.time() * 1000),
-                                json.dumps(data), 
+                                json.dumps(data).replace("'", "''"), 
                                 __opts__['id'], 
                                 tag)
+        #import pdb; pdb.set_trace()
+        log.debug("event_return query=>{0}".format(query))
 
         # cassandra_cql.cql_query may raise a CommandExecutionError
         try:
@@ -230,11 +236,16 @@ def save_load(jid, load):
     '''
     Save the load to the specified jid id
     '''
+    # Load is being stored as a text datatype. Single quotes are used in the
+    # VALUES list. Therefore, all single quotes contained in the results from
+    # json.dumps(load) must be escaped Cassandra style.
     query = '''INSERT INTO salt.jids (
                  jid, load
                ) VALUES (
                  '{0}', '{1}'
-               );'''.format(jid, json.dumps(load))
+               );'''.format(jid, json.dumps(load).replace("'", "''"))
+
+    log.debug("save_load query=>{0}".format(query))
 
     # cassandra_cql.cql_query may raise a CommandExecutionError
     try:
@@ -253,6 +264,8 @@ def get_load(jid):
     Return the load data that marks a specified jid
     '''
     query = '''SELECT load FROM salt.jids WHERE jid = '{0}';'''.format(jid)
+
+    log.debug("get_load query=>{0}".format(query))
 
     ret = {}
 
@@ -279,6 +292,8 @@ def get_jid(jid):
     Return the information returned when the specified job id was executed
     '''
     query = '''SELECT minion_id, full_ret FROM salt.salt_returns WHERE jid = '{0}';'''.format(jid)
+
+    log.debug("get_jid query=>{0}".format(query))
 
     ret = {}
 
@@ -308,6 +323,8 @@ def get_fun(fun):
     '''
     query = '''SELECT minion_id, last_fun FROM salt.minions where last_fun = '{0}';'''.format(fun)
 
+    log.debug("get_fun query=>{0}".format(query))
+
     ret = {}
 
     # cassandra_cql.cql_query may raise a CommandExecutionError
@@ -336,9 +353,10 @@ def get_jids():
     '''
     query = '''SELECT DISTINCT jid FROM salt.jids;'''
 
+    log.debug("get_jids query=>{0}".format(query))
+
     ret = []
 
-    #import pdb; pdb.set_trace()
     # cassandra_cql.cql_query may raise a CommandExecutionError
     try:
         data = __salt__['cassandra_cql.cql_query'](query)
@@ -363,6 +381,8 @@ def get_minions():
     Return a list of minions
     '''
     query = '''SELECT DISTINCT minion_id FROM salt.minions;'''
+
+    log.debug("get_minions query=>{0}".format(query))
 
     ret = []
 
