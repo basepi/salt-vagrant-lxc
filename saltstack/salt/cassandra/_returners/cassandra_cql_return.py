@@ -43,6 +43,7 @@ Use the following cassandra database schema::
     USE salt;
 
     CREATE TABLE IF NOT EXISTS salt.salt_returns (
+        customer_id uuid,
         jid text,
         minion_id text,
         fun text,
@@ -50,29 +51,34 @@ Use the following cassandra database schema::
         full_ret text,
         return text,
         success boolean,
-        PRIMARY KEY (jid, minion_id, fun)
+        PRIMARY KEY ((customer_id, jid), minion_id, fun)
     ) WITH CLUSTERING ORDER BY (minion_id ASC, fun ASC);
     CREATE INDEX IF NOT EXISTS salt_returns_minion_id ON salt.salt_returns (minion_id);
     CREATE INDEX IF NOT EXISTS salt_returns_fun ON salt.salt_returns (fun);
 
     CREATE TABLE IF NOT EXISTS salt.jids (
-        jid text PRIMARY KEY,
-        load text
+        customer_id uuid,
+        jid text,
+        load text,
+        PRIMARY KEY ((customer_id, jid))
     );
 
     CREATE TABLE IF NOT EXISTS salt.minions (
-        minion_id text PRIMARY KEY,
-        last_fun text
+        customer_id uuid,
+        minion_id text,
+        last_fun text,
+        PRIMARY KEY ((customer_id, minion_id))
     );
     CREATE INDEX IF NOT EXISTS minions_last_fun ON salt.minions (last_fun);
 
     CREATE TABLE IF NOT EXISTS salt.salt_events (
+        customer_id uuid,
         id timeuuid,
         tag text,
         alter_time timestamp,
         data text,
         master_id text,
-        PRIMARY KEY (id, tag)
+        PRIMARY KEY ((customer_id, id), tag)
     ) WITH CLUSTERING ORDER BY (tag ASC);
     CREATE INDEX tag ON salt.salt_events (tag);
 
@@ -139,6 +145,8 @@ log = logging.getLogger(__name__)
 # virtualname 'cassandra_cql'.
 __virtualname__ = 'cassandra_cql'
 
+# TODO: remove the DEFAULT_CUSTOMER_ID and make customer_id required
+DEFAULT_CUSTOMER_ID = uuid.uuid1()
 
 def __virtual__():
     if not HAS_CASSANDRA_DRIVER:
@@ -147,15 +155,16 @@ def __virtual__():
     return True
 
 
-def returner(ret):
+def returner(ret, customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return data to one of potentially many clustered cassandra nodes
     '''
     query = '''INSERT INTO salt.salt_returns (
-                 jid, minion_id, fun, alter_time, full_ret, return, success
+                 customer_id, jid, minion_id, fun, alter_time, full_ret, return, success
                ) VALUES (
-                 '{0}', '{1}', '{2}', '{3}', '{4}', '{5}', {6}
+                 {0} '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', {7}
                );'''.format(
+                 customer_id
                  ret['jid'],
                  ret['id'],
                  ret['fun'],
@@ -178,10 +187,10 @@ def returner(ret):
     # Store the last function called by the minion
     # The data in salt.minions will be used by get_fun and get_minions
     query = '''INSERT INTO salt.minions (
-                 minion_id, last_fun
+                 customer_id, minion_id, last_fun
                ) VALUES (
-                 '{0}', '{1}'
-               );'''.format(ret['id'], ret['fun'])
+                 {0}, '{1}', '{2}'
+               );'''.format(customer_id, ret['id'], ret['fun'])
 
     # cassandra_cql.cql_query may raise a CommandExecutionError
     try:
@@ -194,7 +203,7 @@ def returner(ret):
         raise
 
 
-def event_return(events):
+def event_return(events, customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return event to one of potentially many clustered cassandra nodes
 
@@ -210,10 +219,11 @@ def event_return(events):
         tag = event.get('tag', '')
         data = event.get('data', '')
         query = '''INSERT INTO salt.salt_events (
-                     id, alter_time, data, master_id, tag
+                     customer_id, id, alter_time, data, master_id, tag
                    ) VALUES (
-                     {0}, {1}, '{2}', '{3}', '{4}'
-                   );'''.format(str(uuid.uuid1()),
+                     {0}, {1}, {2}, '{3}', '{4}', '{5}'
+                   );'''.format(customer_id,
+                                str(uuid.uuid1()),
                                 int(time.time() * 1000),
                                 json.dumps(data).replace("'", "''"),
                                 __opts__['id'],
@@ -230,7 +240,7 @@ def event_return(events):
             raise
 
 
-def save_load(jid, load):
+def save_load(jid, load, customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Save the load to the specified jid id
     '''
@@ -238,10 +248,10 @@ def save_load(jid, load):
     # VALUES list. Therefore, all single quotes contained in the results from
     # json.dumps(load) must be escaped Cassandra style.
     query = '''INSERT INTO salt.jids (
-                 jid, load
+                 customer_id, jid, load
                ) VALUES (
-                 '{0}', '{1}'
-               );'''.format(jid, json.dumps(load).replace("'", "''"))
+                 {0}, '{1}', '{2}'
+               );'''.format(customer_id, jid, json.dumps(load).replace("'", "''"))
 
     # cassandra_cql.cql_query may raise a CommandExecutionError
     try:
@@ -255,11 +265,13 @@ def save_load(jid, load):
 
 
 # salt-run jobs.list_jobs FAILED
-def get_load(jid):
+def get_load(jid, customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return the load data that marks a specified jid
     '''
-    query = '''SELECT load FROM salt.jids WHERE jid = '{0}';'''.format(jid)
+    query = '''SELECT load FROM salt.jids
+                WHERE customer_id = {0}
+                  AND jid = '{1}';'''.format(customer_id, jid)
 
     ret = {}
 
@@ -281,11 +293,14 @@ def get_load(jid):
 
 
 # salt-call ret.get_jid cassandra_cql 20150327234537907315 PASSED
-def get_jid(jid):
+def get_jid(jid, customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return the information returned when the specified job id was executed
     '''
-    query = '''SELECT minion_id, full_ret FROM salt.salt_returns WHERE jid = '{0}';'''.format(jid)
+    query = '''SELECT minion_id, full_ret
+                 FROM salt.salt_returns
+                WHERE customer_id = {0}
+                  AND jid = '{1}';'''.format(customer_id, jid)
 
     ret = {}
 
@@ -309,11 +324,14 @@ def get_jid(jid):
 
 
 # salt-call ret.get_fun cassandra_cql test.ping PASSED
-def get_fun(fun):
+def get_fun(fun, customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return a dict of the last function called for all minions
     '''
-    query = '''SELECT minion_id, last_fun FROM salt.minions where last_fun = '{0}';'''.format(fun)
+    query = '''SELECT minion_id, last_fun
+                 FROM salt.minions
+                WHERE customer_id = {0}
+                  AND last_fun = '{1}';'''.format(customer_id, fun)
 
     ret = {}
 
@@ -337,11 +355,13 @@ def get_fun(fun):
 
 
 # salt-call ret.get_jids cassandra_cql PASSED
-def get_jids():
+def get_jids(customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return a list of all job ids
     '''
-    query = '''SELECT DISTINCT jid FROM salt.jids;'''
+    query = '''SELECT DISTINCT jid
+                 FROM salt.jids
+                WHERE customer_id = {0};'''.format(customer_id)
 
     ret = []
 
@@ -364,11 +384,13 @@ def get_jids():
 
 
 # salt-call ret.get_minions cassandra_cql PASSED
-def get_minions():
+def get_minions(customer_id=DEFAULT_CUSTOMER_ID):
     '''
     Return a list of minions
     '''
-    query = '''SELECT DISTINCT minion_id FROM salt.minions;'''
+    query = '''SELECT DISTINCT minion_id
+                 FROM salt.minions
+                WHERE customer_id = {0};'''.format(customer_id)
 
     ret = []
 
@@ -390,7 +412,7 @@ def get_minions():
     return ret
 
 
-def prep_jid(nocache, passed_jid=None):  # pylint: disable=unused-argument
+def prep_jid(nocache, passed_jid=None, customer_id=DEFAULT_CUSTOMER_ID):  # pylint: disable=unused-argument
     '''
     Do any work necessary to prepare a JID, including sending a custom id
     '''
