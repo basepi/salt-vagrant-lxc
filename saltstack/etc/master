@@ -652,3 +652,4 @@ cassandra:
 
 #master_job_cache: cassandra_cql
 #event_return: cassandra_cql
+customer_id: 352c64c0-dc20-11e4-975d-5af42be33da7

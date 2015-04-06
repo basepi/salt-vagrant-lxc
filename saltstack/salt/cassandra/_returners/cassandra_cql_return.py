@@ -51,8 +51,9 @@ Use the following cassandra database schema::
         full_ret text,
         return text,
         success boolean,
-        PRIMARY KEY ((customer_id, jid), minion_id, fun)
-    ) WITH CLUSTERING ORDER BY (minion_id ASC, fun ASC);
+        PRIMARY KEY (customer_id, jid, minion_id, fun)
+    ) WITH CLUSTERING ORDER BY (jid ASC, minion_id ASC, fun ASC)
+        AND comment = 'Salt job results. Required for minimal Salt returner support';
     CREATE INDEX IF NOT EXISTS salt_returns_minion_id ON salt.salt_returns (minion_id);
     CREATE INDEX IF NOT EXISTS salt_returns_fun ON salt.salt_returns (fun);
 
@@ -60,15 +61,18 @@ Use the following cassandra database schema::
         customer_id uuid,
         jid text,
         load text,
-        PRIMARY KEY ((customer_id, jid))
-    );
+        PRIMARY KEY (customer_id, jid)
+    ) WITH CLUSTERING ORDER BY (jid ASC)
+        AND comment = 'Salt jobs. Required for Master Job Cache and External Job Cache support';
+    CREATE INDEX IF NOT EXISTS jids_jid ON salt.jids (jid);
 
     CREATE TABLE IF NOT EXISTS salt.minions (
         customer_id uuid,
         minion_id text,
         last_fun text,
-        PRIMARY KEY ((customer_id, minion_id))
-    );
+        PRIMARY KEY (customer_id, minion_id)
+    ) WITH CLUSTERING ORDER BY (minion_id ASC)
+        AND comment = 'The last function called by each minion.';
     CREATE INDEX IF NOT EXISTS minions_last_fun ON salt.minions (last_fun);
 
     CREATE TABLE IF NOT EXISTS salt.salt_events (
@@ -78,10 +82,10 @@ Use the following cassandra database schema::
         alter_time timestamp,
         data text,
         master_id text,
-        PRIMARY KEY ((customer_id, id), tag)
-    ) WITH CLUSTERING ORDER BY (tag ASC);
-    CREATE INDEX tag ON salt.salt_events (tag);
-
+        PRIMARY KEY (customer_id, id, tag)
+    ) WITH CLUSTERING ORDER BY (id ASC, tag ASC)
+        AND comment = 'All Salt events.';
+    CREATE INDEX IF NOT EXISTS tag ON salt.salt_events (tag);
 
 Required python modules: cassandra-driver
 
@@ -145,8 +149,13 @@ log = logging.getLogger(__name__)
 # virtualname 'cassandra_cql'.
 __virtualname__ = 'cassandra_cql'
 
-# TODO: remove the DEFAULT_CUSTOMER_ID and make customer_id required
-DEFAULT_CUSTOMER_ID = uuid.uuid1()
+# TODO: remove the default_customer_id and make customer_id required when
+#       calling functions.
+#try:
+#    default_customer_id = __salt__['config.option']('customer_id')
+#except BaseException as e:
+#    log.error("Failed to get cassandra config options. Reason: {0}".format(str(e)))
+#    raise
 
 def __virtual__():
     if not HAS_CASSANDRA_DRIVER:
@@ -155,16 +164,24 @@ def __virtual__():
     return True
 
 
-def returner(ret, customer_id=DEFAULT_CUSTOMER_ID):
+def returner(ret, customer_id=None):
     '''
     Return data to one of potentially many clustered cassandra nodes
     '''
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
     query = '''INSERT INTO salt.salt_returns (
                  customer_id, jid, minion_id, fun, alter_time, full_ret, return, success
                ) VALUES (
-                 {0} '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', {7}
+                 {0}, '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', {7}
                );'''.format(
-                 customer_id
+                 customer_id,
                  ret['jid'],
                  ret['id'],
                  ret['fun'],
@@ -203,7 +220,7 @@ def returner(ret, customer_id=DEFAULT_CUSTOMER_ID):
         raise
 
 
-def event_return(events, customer_id=DEFAULT_CUSTOMER_ID):
+def event_return(events, customer_id=None):
     '''
     Return event to one of potentially many clustered cassandra nodes
 
@@ -215,6 +232,14 @@ def event_return(events, customer_id=DEFAULT_CUSTOMER_ID):
     number accross all nodes in a distributed database. Each event
     will be assigned a uuid by the connecting client.
     '''
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
     for event in events:
         tag = event.get('tag', '')
         data = event.get('data', '')
@@ -240,10 +265,18 @@ def event_return(events, customer_id=DEFAULT_CUSTOMER_ID):
             raise
 
 
-def save_load(jid, load, customer_id=DEFAULT_CUSTOMER_ID):
+def save_load(jid, load, customer_id=None):
     '''
     Save the load to the specified jid id
     '''
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
     # Load is being stored as a text datatype. Single quotes are used in the
     # VALUES list. Therefore, all single quotes contained in the results from
     # json.dumps(load) must be escaped Cassandra style.
@@ -265,11 +298,20 @@ def save_load(jid, load, customer_id=DEFAULT_CUSTOMER_ID):
 
 
 # salt-run jobs.list_jobs FAILED
-def get_load(jid, customer_id=DEFAULT_CUSTOMER_ID):
+def get_load(jid, customer_id=None):
     '''
     Return the load data that marks a specified jid
     '''
-    query = '''SELECT load FROM salt.jids
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
+    query = '''SELECT load
+                 FROM salt.jids
                 WHERE customer_id = {0}
                   AND jid = '{1}';'''.format(customer_id, jid)
 
@@ -293,10 +335,18 @@ def get_load(jid, customer_id=DEFAULT_CUSTOMER_ID):
 
 
 # salt-call ret.get_jid cassandra_cql 20150327234537907315 PASSED
-def get_jid(jid, customer_id=DEFAULT_CUSTOMER_ID):
+def get_jid(jid, customer_id=None):
     '''
     Return the information returned when the specified job id was executed
     '''
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
     query = '''SELECT minion_id, full_ret
                  FROM salt.salt_returns
                 WHERE customer_id = {0}
@@ -324,10 +374,18 @@ def get_jid(jid, customer_id=DEFAULT_CUSTOMER_ID):
 
 
 # salt-call ret.get_fun cassandra_cql test.ping PASSED
-def get_fun(fun, customer_id=DEFAULT_CUSTOMER_ID):
+def get_fun(fun, customer_id=None):
     '''
     Return a dict of the last function called for all minions
     '''
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
     query = '''SELECT minion_id, last_fun
                  FROM salt.minions
                 WHERE customer_id = {0}
@@ -355,11 +413,19 @@ def get_fun(fun, customer_id=DEFAULT_CUSTOMER_ID):
 
 
 # salt-call ret.get_jids cassandra_cql PASSED
-def get_jids(customer_id=DEFAULT_CUSTOMER_ID):
+def get_jids(customer_id=None):
     '''
     Return a list of all job ids
     '''
-    query = '''SELECT DISTINCT jid
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
+    query = '''SELECT jid
                  FROM salt.jids
                 WHERE customer_id = {0};'''.format(customer_id)
 
@@ -384,11 +450,20 @@ def get_jids(customer_id=DEFAULT_CUSTOMER_ID):
 
 
 # salt-call ret.get_minions cassandra_cql PASSED
-def get_minions(customer_id=DEFAULT_CUSTOMER_ID):
+def get_minions(customer_id=None):
     '''
     Return a list of minions
     '''
-    query = '''SELECT DISTINCT minion_id
+
+    #import pdb; pdb.set_trace()
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
+    query = '''SELECT minion_id
                  FROM salt.minions
                 WHERE customer_id = {0};'''.format(customer_id)
 
@@ -412,8 +487,16 @@ def get_minions(customer_id=DEFAULT_CUSTOMER_ID):
     return ret
 
 
-def prep_jid(nocache, passed_jid=None, customer_id=DEFAULT_CUSTOMER_ID):  # pylint: disable=unused-argument
+def prep_jid(nocache, passed_jid=None, customer_id=None):  # pylint: disable=unused-argument
     '''
     Do any work necessary to prepare a JID, including sending a custom id
     '''
+
+    if not customer_id:
+        try:
+            customer_id = __salt__['config.option']('customer_id')
+        except BaseException as e:
+            log.error("Failed to get customer_id. Reason: {0}".format(str(e)))
+            raise
+
     return passed_jid if passed_jid is not None else salt.utils.jid.gen_jid()
