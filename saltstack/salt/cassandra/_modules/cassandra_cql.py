@@ -42,6 +42,8 @@ import json
 from salt.exceptions import CommandExecutionError
 from salt.ext import six
 
+log = logging.getLogger(__name__)
+
 __virtualname__ = 'cassandra_cql'
 
 HAS_DRIVER = False
@@ -56,8 +58,6 @@ try:
     HAS_DRIVER = True
 except ImportError:
     pass
-
-log = logging.getLogger(__name__)
 
 
 def __virtual__():
@@ -136,16 +136,16 @@ def _connect(contact_points=None, port=None, cql_user=None, cql_pass=None):
     # function, or something similar for each loaded module, connection pools
     # and the like can be gracefully reclaimed/shutdown.
     if (__context__
-       and 'cassandra_cql_returner_cluster' in __context__
-       and 'cassandra_cql_returner_session' in __context__):
-       return __context__['cassandra_cql_returner_cluster'], __context__['cassandra_cql_returner_session']
+        and 'cassandra_cql_returner_cluster' in __context__
+        and 'cassandra_cql_returner_session' in __context__):
+        return __context__['cassandra_cql_returner_cluster'], __context__['cassandra_cql_returner_session']
     else:
         contact_points = _load_properties(property_name=contact_points, config_option='cluster')
         contact_points = contact_points if isinstance(contact_points, list) else contact_points.split(',')
         port = _load_properties(property_name=port, config_option='port', set_default=True, default=9042)
         cql_user = _load_properties(property_name=cql_user, config_option='username', set_default=True, default="cassandra")
         cql_pass = _load_properties(property_name=cql_pass, config_option='password', set_default=True, default="cassandra")
-    
+
         try:
             auth_provider = PlainTextAuthProvider(username=cql_user, password=cql_pass)
             cluster = Cluster(contact_points, port=port, auth_provider=auth_provider)
