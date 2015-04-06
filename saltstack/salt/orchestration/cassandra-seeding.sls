@@ -35,10 +35,11 @@ cassandra_nodes_startup:
     - require:
       - salt: cassandra_seed_ddl
 
-cassandra_cql_runner_install:
+cassandra_cql_custom_install:
   salt.state:
     - tgt: '*'
-    - sls: cassandra.add-custom-returners
+    - sls: 
+        - cassandra.add-custom-returners
     - require:
       - salt: cassandra_nodes_startup
 
@@ -47,4 +48,4 @@ enable_master_job_cache:
     - tgt: 'master_minion'
     - sls: cassandra.enable-in-master-config
     - require:
-      - salt: cassandra_cql_runner_install
+      - salt: cassandra_cql_custom_install

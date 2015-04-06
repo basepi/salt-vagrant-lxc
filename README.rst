@@ -138,17 +138,11 @@ The state of the node in relation to the cluster.::
     UN  192.168.50.12  56.01 KB   256     ?       9f6169d7-d828-4c75-adc3-ce5185ab8eb1  rack1
     UN  192.168.50.13  110.74 KB  256     ?       8da76757-76e4-4099-8ec5-9aa34aca921b  rack1
 
-Occationally, Cassandra will stacktrace or timeout when nodes are joining the
-cluster for the first time (bootstrapping).::
-
-    java.lang.RuntimeException: Error during boostrap: Stream failed
-
-In Cassandra release 2.1.x, only one node can bootstrap and join the cluster at
-a time. If 192.168.50.12 or 192.168.50.13 is not displayed or fails to join or
-enter the "UN" (up, normal) state, login to the master and make sure cassandra
-is running on each cassandra node. If the service is down and the node has yet
-to join the cluster. The node will immediately join as soon as the cassandra
-service is started.
+If 192.168.50.12 or 192.168.50.13 is not displayed or fails to join the cluster
+or enter the "UN" (up, normal) state, login to the master and make sure
+cassandra is running on each cassandra node. If the service is down and the node
+has yet to join the cluster, the node will immediately join as soon as the
+cassandra service is started.
 
 .. code-block:: bash
 
