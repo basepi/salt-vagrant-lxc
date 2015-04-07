@@ -1,6 +1,6 @@
 base:
   '*':
-    - pip
+    - required-packages
     - cassandra.driver
   'roles:cassandra*':
     - match: grain

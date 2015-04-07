@@ -7,4 +7,5 @@ required_pkgs:
     - pkgs:
       - python
       - python-pip
+      - python-blist
       - wget

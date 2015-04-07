@@ -20,7 +20,11 @@ install-libsodium:
   cmd.run:
     - name: |
         cd /tmp
-        wget -O libsodium.tar.gz https://download.libsodium.org/libsodium/releases/LATEST.tar.gz
+        if test -e /srv/downloads/libsodium.tar.gz
+            cp /srv/downloads/libsodium.tar.gz ./
+        then
+            wget -O libsodium.tar.gz https://download.libsodium.org/libsodium/releases/LATEST.tar.gz
+        fi
         tar xzf libsodium.tar.gz -C /usr/src/
         cd /usr/src/libsodium*
         ./configure && make && make install
