@@ -7,7 +7,7 @@ VAGRANTFILE_API_VERSION = "2"
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.define :master do |master_config|
     #master_config.vm.box = "hashicorp/precise64"
-    master_config.vm.box = "fgrehm/precise64-lxc"
+    master_config.vm.box = "fgrehm/trusty64-lxc"
     master_config.vm.host_name = 'saltmaster.local'
     #master_config.vm.network "private_network", ip: "192.168.50.10"
     master_config.vm.network "private_network", ip: "192.168.50.10", lxc__bridge_name: 'vlxcbr1'
@@ -45,7 +45,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.define :minion1 do |minion_config|
     #minion_config.vm.box = "hashicorp/precise64"
-    minion_config.vm.box = "fgrehm/precise64-lxc"
+    minion_config.vm.box = "fgrehm/trusty64-lxc"
     minion_config.vm.host_name = 'saltminion1.local'
     #minion_config.vm.network "private_network", ip: "192.168.50.11"
     minion_config.vm.network "private_network", ip: "192.168.50.11", lxc__bridge_name: 'vlxcbr1'
@@ -65,11 +65,16 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       #salt.install_args = '2015.2'
       salt.verbose = true
     end
+
+    minion_config.vm.provision "shell", inline: <<-SHELL
+        sudo salt-call --local pkg.install at
+        sudo echo 'service salt-minion restart' | sudo at now + 1 minute
+    SHELL
   end
 
   config.vm.define :minion2 do |minion_config|
     #minion_config.vm.box = "hashicorp/precise64"
-    minion_config.vm.box = "fgrehm/precise64-lxc"
+    minion_config.vm.box = "fgrehm/wheezy64-lxc"
     # The following line can be uncommented to use Centos
     # instead of Ubuntu.
     # Comment out the above line as well
@@ -77,11 +82,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     minion_config.vm.host_name = 'saltminion2.local'
     #minion_config.vm.network "private_network", ip: "192.168.50.12"
     minion_config.vm.network "private_network", ip: "192.168.50.12", lxc__bridge_name: 'vlxcbr1'
-    minion_config.vm.provision "file",
-        source: "./saltstack/salt/apt-cacher/apt-cacher.conf",
-        destination: "~/apt-cacher.conf"
-    minion_config.vm.provision "shell",
-            inline: "cp /home/vagrant/apt-cacher.conf /etc/apt/apt.conf.d/apt-cacher.conf"
 
     minion_config.vm.provision :salt do |salt|
       salt.minion_config = "saltstack/etc/minion2"
@@ -93,12 +93,17 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       #salt.install_args = '2015.2'
       salt.verbose = true
     end
+
+    minion_config.vm.provision "shell", inline: <<-SHELL
+        sudo salt-call --local pkg.install at
+        sudo echo 'service salt-minion restart' | sudo at now + 1 minute
+    SHELL
   end
 
   config.vm.define :minion3 do |minion_config|
     #minion_config.vm.box = "hashicorp/precise64"
     #minion_config.vm.box = "fgrehm/centos-6-64-lxc"
-    minion_config.vm.box = "fgrehm/precise64-lxc"
+    minion_config.vm.box = "fgrehm/centos-6-64-lxc"
     # The following line can be uncommented to use Centos
     # instead of Ubuntu.
     # Comment out the above line as well
@@ -106,11 +111,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     minion_config.vm.host_name = 'saltminion3.local'
     #minion_config.vm.network "private_network", ip: "192.168.50.12"
     minion_config.vm.network "private_network", ip: "192.168.50.13", lxc__bridge_name: 'vlxcbr1'
-    minion_config.vm.provision "file",
-        source: "./saltstack/salt/apt-cacher/apt-cacher.conf",
-        destination: "~/apt-cacher.conf"
-    minion_config.vm.provision "shell",
-            inline: "cp /home/vagrant/apt-cacher.conf /etc/apt/apt.conf.d/apt-cacher.conf"
 
     minion_config.vm.provision :salt do |salt|
       salt.minion_config = "saltstack/etc/minion3"
@@ -122,6 +122,12 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       #salt.install_args = '2015.2'
       salt.verbose = true
     end
+
+    minion_config.vm.provision "shell", inline: <<-SHELL
+        sudo salt-call --local pkg.install at
+        sudo service atd start
+        sudo echo 'service salt-minion restart' | sudo at now + 1 minute
+    SHELL
   end
 
 end
