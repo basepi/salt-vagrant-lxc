@@ -1,9 +1,9 @@
 # Install the python module to test
 include:
-  - pip
+  - required-packages
 
 cassandra-driver:
   pip.installed:
     - name: cassandra-driver
     - require:
-      - sls: pip
+      - sls: required-packages
