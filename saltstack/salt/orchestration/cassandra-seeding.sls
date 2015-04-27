@@ -27,25 +27,26 @@ cassandra_seed_ddl:
     - require:
       - salt: cassandra_seeds_startup
 
-cassandra_nodes_startup:
-  salt.state:
-    - tgt: 'roles:cassandra-node'
-    - tgt_type: grain
-    - sls: cassandra.start
-    - require:
-      - salt: cassandra_seed_ddl
+#cassandra_nodes_startup:
+#  salt.state:
+#    - tgt: 'roles:cassandra-node'
+#    - tgt_type: grain
+#    - sls: cassandra.start
+#    - require:
+#      - salt: cassandra_seed_ddl
 
-cassandra_cql_custom_install:
-  salt.state:
-    - tgt: '*'
-    - sls: 
-        - cassandra.add-custom-returners
-    - require:
-      - salt: cassandra_nodes_startup
+#cassandra_cql_custom_install:
+#  salt.state:
+#    - tgt: '*'
+#    - sls: 
+#        - cassandra.add-custom-returners
+#    - require:
+#      - salt: cassandra_nodes_startup
 
 enable_master_job_cache:
   salt.state:
     - tgt: 'master_minion'
     - sls: cassandra.enable-in-master-config
     - require:
-      - salt: cassandra_cql_custom_install
+      - salt: cassandra_seed_ddl
+#      - salt: cassandra_cql_custom_install

@@ -51,3 +51,44 @@
     ) WITH CLUSTERING ORDER BY (id ASC, tag ASC)
         AND comment = 'All Salt events.';
     CREATE INDEX IF NOT EXISTS tag ON salt.salt_events (tag);
+
+    CREATE TABLE IF NOT EXISTS salt.master_config (
+        customer_id uuid,
+        master text,
+        key text,
+        val text,
+        PRIMARY KEY (customer_id, master)
+    ) WITH CLUSTERING ORDER BY (master ASC)
+        AND comment = 'Master configuration data.';
+
+    CREATE TABLE IF NOT EXISTS salt.cmd (
+        customer_id uuid,
+        jid text,
+        cmd text,
+        masters_to list<text>,
+        masters_done list<text>,
+        low text,
+        PRIMARY KEY (customer_id, jid, cmd)
+    ) WITH CLUSTERING ORDER BY (jid ASC, cmd ASC)
+        AND comment = 'Command Execution table.';
+    CREATE INDEX IF NOT EXISTS cmd ON salt.cmd(cmd);
+
+    CREATE TABLE IF NOT EXISTS salt.minion_key (
+        customer_id uuid,
+        master text,
+        accepted list<text>,
+        rejected list<text>,
+        pending list<text>,
+        denied list<text>,
+        PRIMARY KEY (customer_id, master)
+    ) WITH CLUSTERING ORDER BY (master ASC)
+        AND comment = 'Minion Key tables';
+
+    CREATE TABLE IF NOT EXISTS salt.minions_cache (
+        customer_id uuid,
+        master text,
+        minion text,
+        grains text,
+        PRIMARY KEY (customer_id, master, minion)
+    ) WITH CLUSTERING ORDER BY (master ASC, minion ASC)
+        AND comment = 'Minion data cache';

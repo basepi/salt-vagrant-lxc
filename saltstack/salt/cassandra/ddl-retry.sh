@@ -5,7 +5,7 @@ for second in {1..30}
 do
     echo "Try $second"
     sleep 1
-    cqlsh 192.168.50.11 -u cassandra -p cassandra -f /tmp/salt-ddl.cql
+    cqlsh 192.168.50.10 -u cassandra -p cassandra -f /tmp/salt-ddl.cql
     RC=$?
     echo "RC=$RC"
     if test $RC -eq 0
