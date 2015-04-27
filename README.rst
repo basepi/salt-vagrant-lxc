@@ -29,8 +29,27 @@ Conclusion::
 Instructions
 ============
 
-Run the following commands in a terminal after installing Vagrant, the Vagrant LXC plugin, and
-your host's LXC packages.
+This project clones data from Salt Stack's private repos on github. PKI is
+required to fully automate provisioning of a RAAS dev environment. You must
+have at least read access to https://github.com/SS-priv/raas and you must
+have a public key added to your github account.
+
+By default, the Vagrantfile maps /root/.ssh on your system to /root/.ssh on
+in the LXC container. If you would like to use key-pairs in a different
+location, modify the Vagrantfile to map the correct directory on your host.
+For example, replacing `<username>` with your POSIX user in the example
+below would map the .ssh directory in your home directory to the LXC
+container's /root/.ssh directory. The provisioning script runs as root
+within the LXC container.
+
+.. code-block:: Vagrantfile
+
+    ...
+    master_config.vm.synced_folder "/home/<usename>/.ssh", "/root/.ssh"
+    ...
+
+Run the following commands in a terminal after installing Vagrant, the Vagrant
+LXC plugin, and your host's LXC packages.
 
 Hint: If your OS does not provide a package for the Vagrant LXC plugin, you can
 install it from within vagrant::
@@ -172,3 +191,10 @@ salt-key -L should now produce the following result::
         
     salt_returns  cmd            minions_cache  salt_events  minions
     tgt           master_config  jids           minion_key 
+    salt@cqlsh:salt> select * from jids;
+    
+     customer_id                          | jid                  | load
+    --------------------------------------+----------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     a9b1f4bf-8aea-4fd2-8b0e-24ab9a416859 | 20150427192150556978 | {"fun": "test.ping", "ret": "", "tgt": "*", "arg": [], "jid": "20150427192150556978", "cmd": "publish", "kwargs": {"show_jid": false, "delimiter": ":", "show_timeout": true}, "tgt_type": "glob", "user": "sudo_vagrant"}
+    
+    (1 rows)
