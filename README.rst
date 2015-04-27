@@ -51,18 +51,18 @@ within the LXC container.
 Run the following commands in a terminal after installing Vagrant, the Vagrant
 LXC plugin, and your host's LXC packages.
 
-Hint: If your OS does not provide a package for the Vagrant LXC plugin, you can
-install it from within vagrant::
-
-.. code-block:: bash
-
-    vagrant plugin install vagrant-lxc
-
 .. code-block:: bash
 
     git clone https://github.com/ckochenower/salt-vagrant-lxc.git -b raas_dev
     cd salt-vagrant-lxc
     vagrant up --provider=lxc
+
+Hint: If your OS does not provide a package for the Vagrant LXC plugin, you can
+install it from within vagrant:
+
+.. code-block:: bash 
+
+   vagrant plugin install vagrant-lxc
 
 This will download an Ubuntu LXC compatible image and create 1 container/node.
 The node will be a Salt Master named `master` and a Salt Minion named
@@ -82,13 +82,13 @@ You should see something similar to the following::
 
 Open 4 terminals and login to `master` in each terminal. The following is run
 from the directory containing the Vagrantfile in this project to login to the
-`master`.::
+`master`.:
 
 .. code-block:: bash
 
     vagrant ssh master
 
-Once logged in, become root::
+Once logged in, become root:
 
 .. code-block:: bash
 
@@ -96,27 +96,27 @@ Once logged in, become root::
 
 Do the following in each respective terminal to start all required processes:
 
-Terminal 1::
+Terminal 1:
 
 .. code-block:: bash
 
     raas
 
-Terminal 2::
+Terminal 2:
 
 .. code-block:: bash
 
     salt-master -l debug
 
-Terminal 3::
+Terminal 3:
 
 .. code-block:: bash
 
     salt-minion -l debug 
 
-Terminal 4::
+Terminal 4:
 
-1. Make sure Cassandra is up and running::
+1. Make sure Cassandra is up and running:
 
 .. code-block:: bash
 
@@ -167,7 +167,7 @@ salt-key -L should produce the following result::
     master_minion
     Rejected Keys:
 
-4. Accept the master_minion key.::
+4. Accept the master_minion key.:
 
 .. code-block:: bash
 
@@ -182,7 +182,7 @@ salt-key -L should now produce the following result::
     Unaccepted Keys:
     Rejected Keys:
 
-5. Login to Cassandra and make sure data is persisting to the DB::
+5. Login to Cassandra and make sure data is persisting to the DB:
 
 .. code-block:: bash
 
