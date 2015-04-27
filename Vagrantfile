@@ -58,7 +58,7 @@ engines:
   raas: {}
 master_job_cache: raas
 event_return: raas
-raas_server: localhost
+raas_server: http://192.168.50.10
 EOL
 
 # Add the following to /etc/salt/minion
