@@ -198,3 +198,11 @@ salt-key -L should now produce the following result::
      a9b1f4bf-8aea-4fd2-8b0e-24ab9a416859 | 20150427192150556978 | {"fun": "test.ping", "ret": "", "tgt": "*", "arg": [], "jid": "20150427192150556978", "cmd": "publish", "kwargs": {"show_jid": false, "delimiter": ":", "show_timeout": true}, "tgt_type": "glob", "user": "sudo_vagrant"}
     
     (1 rows)
+    
+6. Make sure you setup your git config so you don't push as root
+
+.. code-block: bash
+
+    git config --global user.name "Corin Kochenower"
+    git config --global user.email "ckochenower@saltstack.com"
+
