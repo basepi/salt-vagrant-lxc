@@ -61,6 +61,8 @@ engines:
 master_job_cache: raas
 event_return: raas
 raas_server: http://192.168.50.10
+raas_username: root
+raas_password: salt
 EOL
 
 # Add the following to /etc/salt/minion
@@ -103,6 +105,9 @@ cassandra:
   username: salt
   password: salt
 EOL
+
+salt-master -d -ldebug
+salt-minion -d -ldebug
 
 SCRIPT
 
