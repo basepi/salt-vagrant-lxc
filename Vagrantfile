@@ -17,11 +17,13 @@ apt-key add /tmp/cassandra.sources.gpg
 apt-get update
 
 # Install required packages
-apt-get install -y git wget
+apt-get install -y git wget psmisc
 apt-get install -y python python-dev python-pip python-zmq python-yaml python-msgpack python-m2crypto python-jinja2
 apt-get install -y python3 python3-dev python3-pip python3-zmq python3-yaml python3-msgpack python3-tornado
 pip install tornado pycrypto cassandra-driver
-pip3 install pycrypto aiohttp cassandra-driver
+pip3 install pycrypto aiohttp cassandra-driver jsonschema
+pip3 install tornado --upgrade
+pip3 install msgpack-python --upgrade
 
 # Install Oracle Java
 cd /tmp
@@ -69,19 +71,25 @@ EOL
 
 # Get the RAAS source
 cd /usr/src
-git clone git@github.com:SS-priv/raas.git
+git clone git@github.com:saltstack/raas.git
+git clone git@github.com:saltstack/raas_master.git
 cd raas
 
 # Install the DB schema
-start=$(grep -nr "# BEGIN DDL" raas/bigret/cassandra_cql_return.py | cut -d":" -f1)
-end=$(grep -nr "# END DDL" raas/bigret/cassandra_cql_return.py | cut -d":" -f1)
-sed -n $((start+1)),$((end-1))p raas/bigret/cassandra_cql_return.py > /tmp/cassandra.ddl.cql
-cqlsh 192.168.50.10 -u cassandra -p cassandra -f /tmp/cassandra.ddl.cql
+cat >>/tmp/cassandra_create_user.cql <<end-of-script
+CREATE USER IF NOT EXISTS salt WITH PASSWORD 'salt' NOSUPERUSER;
+GRANT ALL PERMISSIONS on ALL KEYSPACES to salt;
+end-of-script
+cqlsh 192.168.50.10 -u cassandra -p cassandra -f /tmp/cassandra_create_user.cql
 
 # Install RAAS
 python3 setup.py install --force
-cp raas/engines/raas* /usr/local/lib/python2.7/dist-packages/salt/engines/
-cp raas/returner/raas* /usr/local/lib/python2.7/dist-packages/salt/returners/
+cd ../raas_master
+cp salt/engines/raas* /usr/local/lib/python2.7/dist-packages/salt/engines/
+cp salt/returners/raas* /usr/local/lib/python2.7/dist-packages/salt/returners/
+cp salt/fileserver/raas* /usr/local/lib/python2.7/dist-packages/salt/fileserver/
+cp salt/pillar/raas* /usr/local/lib/python2.7/dist-packages/salt/pillar/
+cd ../raas
 
 #Add the following to /etc/raas/raas
 mkdir -p /etc/raas
