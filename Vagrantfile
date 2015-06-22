@@ -79,8 +79,8 @@ cd raas
 
 # Install the DB schema
 cat >>/tmp/cassandra_create_user.cql <<end-of-script
-CREATE USER IF NOT EXISTS salt WITH PASSWORD 'salt' NOSUPERUSER;
-GRANT ALL PERMISSIONS on ALL KEYSPACES to salt;
+CREATE USER IF NOT EXISTS root WITH PASSWORD 'salt' NOSUPERUSER;
+GRANT ALL PERMISSIONS on ALL KEYSPACES to root;
 end-of-script
 cqlsh 192.168.50.10 -u cassandra -p cassandra -f /tmp/cassandra_create_user.cql
 
@@ -102,7 +102,7 @@ cassandra:
   cluster:
     - 192.168.50.10
   port: 9042
-  username: salt
+  username: root
   password: salt
 EOL
 
