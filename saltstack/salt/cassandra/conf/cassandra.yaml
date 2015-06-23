@@ -416,7 +416,7 @@ start_rpc: true
 #
 # Note that unlike listen_address, you can specify 0.0.0.0, but you must also
 # set broadcast_rpc_address to a value other than 0.0.0.0.
-#rpc_address: localhost
+rpc_address: localhost
 # rpc_interface: eth1
 
 # port for Thrift to listen for clients on

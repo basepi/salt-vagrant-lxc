@@ -63,6 +63,8 @@ event_return: raas
 raas_server: http://192.168.50.10
 raas_username: root
 raas_password: salt
+ext_pillar:
+  - raas
 EOL
 
 # Add the following to /etc/salt/minion
@@ -82,7 +84,7 @@ cat >>/tmp/cassandra_create_user.cql <<end-of-script
 CREATE USER IF NOT EXISTS root WITH PASSWORD 'salt' NOSUPERUSER;
 GRANT ALL PERMISSIONS on ALL KEYSPACES to root;
 end-of-script
-cqlsh 192.168.50.10 -u cassandra -p cassandra -f /tmp/cassandra_create_user.cql
+cqlsh localhost -u cassandra -p cassandra -f /tmp/cassandra_create_user.cql
 
 # Install RAAS
 python3 setup.py install --force
@@ -100,7 +102,7 @@ cat >/etc/raas/raas <<EOL
 bigret: cassandra
 cassandra:
   cluster:
-    - 192.168.50.10
+    - localhost
   port: 9042
   username: root
   password: salt
