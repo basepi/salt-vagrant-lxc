@@ -31,10 +31,10 @@ Instructions
 
 This project clones data from Salt Stack's private repos on github. PKI is
 required to fully automate provisioning of a RAAS dev environment. You must
-have at least read access to https://github.com/SS-priv/raas and you must
+have at least read access to https://github.com/saltstack/raas and you must
 have a public key added to your github account.
 
-By default, the Vagrantfile maps /root/.ssh on your system to /root/.ssh on
+By default, the Vagrantfile maps /root/.ssh on your system to /root/.ssh
 in the LXC container. If you would like to use key-pairs in a different
 location, modify the Vagrantfile to map the correct directory on your host.
 For example, replacing `<username>` with your POSIX user in the example
@@ -178,16 +178,28 @@ test.ping should produce the following result::
 
 .. code-block:: bash
 
-    root@saltmaster:/usr/src# cqlsh 192.168.50.10 -u salt -p salt -k salt
-    salt@cqlsh:salt> desc tables;
+    root@saltmaster:~# cqlsh localhost -u root -p salt
+    Connected to Test Cluster at localhost:9042.
+    [cqlsh 5.0.1 | Cassandra 2.1.6 | CQL spec 3.2.0 | Native protocol v3]
+    Use HELP for help.
+    root@cqlsh> desc keyspaces;
 
-    salt_returns  cmd            minions_cache  salt_events  minions
-    tgt           master_config  jids           minion_key
-    salt@cqlsh:salt> select * from jids;
+    system_traces  system_auth  raas_a9b1f4bf8aea4fd28b0e24ab9a4  system
 
-     customer_id                          | jid                  | load
-    --------------------------------------+----------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-     a9b1f4bf-8aea-4fd2-8b0e-24ab9a416859 | 20150427192150556978 | {"fun": "test.ping", "ret": "", "tgt": "*", "arg": [], "jid": "20150427192150556978", "cmd": "publish", "kwargs": {"show_jid": false, "delimiter": ":", "show_timeout": true}, "tgt_type": "glob", "user": "sudo_vagrant"}
+    root@cqlsh> use raas_a9b1f4bf8aea4fd28b0e24ab9a4;
+    root@cqlsh:raas_a9b1f4bf8aea4fd28b0e24ab9a4> desc tables;
+
+    salt_returns     schema_version  files        groups       routines 
+    internal_caches  minions_cache   users        minions      directory
+    auth_configs     pillars         minion_keys  permissions
+    efilters         salt_events     cmds         audit      
+    masters_config   tgts            jids         roles
+
+    root@cqlsh:raas_a9b1f4bf8aea4fd28b0e24ab9a4> select * from jids;
+
+     partkey              | jid                  | user | load
+    ----------------------+----------------------+------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     20150623215457029819 | 20150623215457029819 | root | 0x81a46c6f616489a3636d64a77075626c697368a36a6964b43230313530363233323135343537303239383139a66b776172677383ac73686f775f74696d656f7574c3a964656c696d69746572a13aa873686f775f6a6964c2a361726790a475736572a4726f6f74a87467745f74797065a4676c6f62a3726574a0a3746774a12aa366756ea9746573742e70696e67
 
     (1 rows)
 
