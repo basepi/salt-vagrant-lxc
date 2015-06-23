@@ -60,7 +60,7 @@ LXC plugin, and your host's LXC packages.
 Hint: If your OS does not provide a package for the Vagrant LXC plugin, you can
 install it from within vagrant:
 
-.. code-block:: bash 
+.. code-block:: bash
 
    vagrant plugin install vagrant-lxc
 
@@ -80,7 +80,7 @@ You should see something similar to the following::
 
     master                    running (lxc)
 
-Open 4 terminals and login to `master` in each terminal. The following is run
+Open 2 terminals and login to `master` in each terminal. The following is run
 from the directory containing the Vagrantfile in this project to login to the
 `master`.:
 
@@ -94,27 +94,18 @@ Once logged in, become root:
 
     sudo -i
 
-Do the following in each respective terminal to start all required processes:
+Do the following in each respective terminal to start all required processes
+(note that the salt-minion and salt-master start automatically on
+``vagrant up``. If you want, you can stop them and start them in the
+foreground):
 
 Terminal 1:
 
 .. code-block:: bash
 
-    raas
+    raas -ldebug
 
 Terminal 2:
-
-.. code-block:: bash
-
-    salt-master -l debug
-
-Terminal 3:
-
-.. code-block:: bash
-
-    salt-minion -l debug 
-
-Terminal 4:
 
 1. Make sure Cassandra is up and running:
 
@@ -124,7 +115,7 @@ Terminal 4:
 
 You should immediately see something similar to the following:
 
-The first two letters encode the status. 
+The first two letters encode the status.
 
 Status - U (up) or D (down)
 Indicates whether the node is functioning or not.
@@ -138,21 +129,11 @@ The state of the node in relation to the cluster.::
     |/ State=Normal/Leaving/Joining/Moving
     --  Address        Load       Tokens  Owns    Host ID                               Rack
     UN  192.168.50.10  62.75 KB   256     ?       d615dce3-edca-4a3b-858d-9ebb49adcc00  rack1
-    
+
     Note: Non-system keyspaces don't have the same replication settings, effective ownership information is meaningless
 
-2. Make sure the master_minion responds to a test.ping
 
-.. code-block:: bash
-
-    salt '*' test.ping
-
-test.ping should produce the following result::
-
-    master_minion:
-        True
-
-3. List all salt keys. The master_minion will be listed under Unaccepted Keys.::
+2. List all salt keys. The master_minion will be listed under Unaccepted Keys.::
 
 .. code-block:: bash
 
@@ -167,7 +148,7 @@ salt-key -L should produce the following result::
     master_minion
     Rejected Keys:
 
-4. Accept the master_minion key.:
+3. Accept the master_minion key.:
 
 .. code-block:: bash
 
@@ -182,27 +163,38 @@ salt-key -L should now produce the following result::
     Unaccepted Keys:
     Rejected Keys:
 
+4. Make sure the master_minion responds to a test.ping
+
+.. code-block:: bash
+
+    salt '*' test.ping
+
+test.ping should produce the following result::
+
+    master_minion:
+        True
+
 5. Login to Cassandra and make sure data is persisting to the DB:
 
 .. code-block:: bash
 
     root@saltmaster:/usr/src# cqlsh 192.168.50.10 -u salt -p salt -k salt
     salt@cqlsh:salt> desc tables;
-        
+
     salt_returns  cmd            minions_cache  salt_events  minions
-    tgt           master_config  jids           minion_key 
+    tgt           master_config  jids           minion_key
     salt@cqlsh:salt> select * from jids;
-    
+
      customer_id                          | jid                  | load
     --------------------------------------+----------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
      a9b1f4bf-8aea-4fd2-8b0e-24ab9a416859 | 20150427192150556978 | {"fun": "test.ping", "ret": "", "tgt": "*", "arg": [], "jid": "20150427192150556978", "cmd": "publish", "kwargs": {"show_jid": false, "delimiter": ":", "show_timeout": true}, "tgt_type": "glob", "user": "sudo_vagrant"}
-    
+
     (1 rows)
-    
+
 6. Make sure you setup your git config so you don't push as root
 
-.. code-block: bash
+.. code-block:: bash
 
-    git config --global user.name "Corin Kochenower"
-    git config --global user.email "ckochenower@saltstack.com"
+    git config --global user.name "<your name>"
+    git config --global user.email "<your e-mail>"
 
