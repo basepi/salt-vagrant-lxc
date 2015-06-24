@@ -21,7 +21,7 @@ apt-get install -y git wget psmisc
 apt-get install -y python python-dev python-pip python-zmq python-yaml python-msgpack python-m2crypto python-jinja2
 apt-get install -y python3 python3-dev python3-pip python3-zmq python3-yaml python3-msgpack python3-tornado
 pip install tornado pycrypto cassandra-driver
-pip3 install pycrypto aiohttp cassandra-driver jsonschema
+pip3 install pycrypto aiohttp cassandra-driver jsonschema pytest pytest-tornado ldap3
 pip3 install tornado --upgrade
 pip3 install msgpack-python --upgrade
 
